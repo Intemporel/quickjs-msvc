@@ -49,6 +49,7 @@
 #include "cutils.h"
 #include "list.h"
 #include "quickjs.h"
+#include "quickjs-map.h"
 #include "libregexp.h"
 #include "libunicode.h"
 #include "dtoa.h"
@@ -7140,7 +7141,17 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
         return; /* protection in the out of memory case */
     
     js_dbuf_init(ctx, &dbuf);
-    if (filename) {
+    if (filename)
+    {
+        char ts_filename[QUICKJS_MAP_PATH_MAX];
+        int ts_line_num = 0, ts_col_num = 0;
+        if (map_javascript_to_typescript(filename, line_num, col_num, ts_filename, &ts_line_num, &ts_col_num))
+        {
+            filename = ts_filename;
+            line_num = ts_line_num;
+            col_num = ts_col_num;
+        }
+
         dbuf_printf(&dbuf, "    at %s", filename);
         if (line_num != -1)
             dbuf_printf(&dbuf, ":%d:%d", line_num, col_num);
@@ -7180,12 +7191,23 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
             int line_num1, col_num1;
 
             b = p->u.func.function_bytecode;
-            if (b->has_debug) {
+            if (b->has_debug)
+            {
+                char ts_filename[QUICKJS_MAP_PATH_MAX];
+                const char *display_filename;
+
                 line_num1 = find_line_num(ctx, b,
                                           sf->cur_pc - b->byte_code_buf - 1, &col_num1);
                 atom_str = JS_AtomToCString(ctx, b->debug.filename);
+                display_filename = atom_str ? atom_str : "<null>";
+                if (atom_str &&
+                    map_javascript_to_typescript(atom_str, line_num1, col_num1, ts_filename, &line_num1, &col_num1))
+                {
+                    display_filename = ts_filename;
+                }
+
                 dbuf_printf(&dbuf, " (%s",
-                            atom_str ? atom_str : "<null>");
+                            display_filename);
                 JS_FreeCString(ctx, atom_str);
                 if (line_num1 != 0)
                     dbuf_printf(&dbuf, ":%d:%d", line_num1, col_num1);
