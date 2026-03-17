@@ -28,20 +28,20 @@
 #include <inttypes.h>
 #include <string.h>
 #include <assert.h>
-#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/time.h>
 #include <time.h>
 #include <signal.h>
 #include <limits.h>
 #include <sys/stat.h>
-#include <dirent.h>
 #if defined(_WIN32)
-#include <windows.h>
+#include "quickjs-win32.h"
 #include <conio.h>
-#include <utime.h>
+#include <sys/utime.h>
 #else
+#include <unistd.h>
+#include <sys/time.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <termios.h>
 #include <sys/ioctl.h>
@@ -64,8 +64,10 @@ typedef sig_t sighandler_t;
 
 #endif
 
+#if !defined(_WIN32)
 /* enable the os.Worker API. It relies on POSIX threads */
 #define USE_WORKER
+#endif
 
 #ifdef USE_WORKER
 #include <pthread.h>
@@ -2704,6 +2706,51 @@ static JSValue js_os_readdir(JSContext *ctx, JSValueConst this_val,
                              int argc, JSValueConst *argv)
 {
     const char *path;
+#if defined(_WIN32)
+    char pattern[PATH_MAX];
+    WIN32_FIND_DATAA ffd;
+    HANDLE hFind;
+    JSValue obj;
+    int err = 0;
+    uint32_t len = 0;
+
+    path = JS_ToCString(ctx, argv[0]);
+    if (!path)
+        return JS_EXCEPTION;
+    obj = JS_NewArray(ctx);
+    if (JS_IsException(obj)) {
+        JS_FreeCString(ctx, path);
+        return JS_EXCEPTION;
+    }
+
+    if (snprintf(pattern, sizeof(pattern), "%s\\*", path) >= (int)sizeof(pattern)) {
+        JS_FreeCString(ctx, path);
+        return make_obj_error(ctx, obj, ENAMETOOLONG);
+    }
+
+    hFind = FindFirstFileA(pattern, &ffd);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        DWORD gle = GetLastError();
+        if (gle == ERROR_FILE_NOT_FOUND || gle == ERROR_PATH_NOT_FOUND)
+            err = ENOENT;
+        else
+            err = EIO;
+        JS_FreeCString(ctx, path);
+        return make_obj_error(ctx, obj, err);
+    }
+
+    do {
+        JS_DefinePropertyValueUint32(ctx, obj, len++,
+                                     JS_NewString(ctx, ffd.cFileName),
+                                     JS_PROP_C_W_E);
+    } while (FindNextFileA(hFind, &ffd));
+
+    if (GetLastError() != ERROR_NO_MORE_FILES)
+        err = EIO;
+    FindClose(hFind);
+    JS_FreeCString(ctx, path);
+    return make_obj_error(ctx, obj, err);
+#else
     DIR *f;
     struct dirent *d;
     JSValue obj;
@@ -2741,6 +2788,7 @@ static JSValue js_os_readdir(JSContext *ctx, JSValueConst this_val,
     closedir(f);
  done:
     return make_obj_error(ctx, obj, err);
+#endif
 }
 
 #if !defined(_WIN32)
@@ -4359,4 +4407,3 @@ void js_std_eval_binary_json_module(JSContext *ctx,
         exit(1);
     }
 }
-

@@ -2036,7 +2036,7 @@ void run_test_dir_list(namelist_t *lp, int start_index, int stop_index)
 
 void help(void)
 {
-    printf("run-test262 version " CONFIG_VERSION "\n"
+    printf("run-test262\n"
            "usage: run-test262 [options] {-f file ... | [dir_list] [index range]}\n"
            "-h             help\n"
            "-a             run tests in strict and nostrict modes\n"

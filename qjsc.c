@@ -392,7 +392,7 @@ static const char main_c_template2[] =
 
 void help(void)
 {
-    printf("QuickJS Compiler version " CONFIG_VERSION "\n"
+    printf("QuickJS Compiler\n"
            "usage: " PROG_NAME " [options] [files]\n"
            "\n"
            "options are:\n"

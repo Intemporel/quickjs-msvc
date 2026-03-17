@@ -290,7 +290,7 @@ static size_t get_suffixed_size(const char *str)
 
 void help(void)
 {
-    printf("QuickJS version " CONFIG_VERSION "\n"
+    printf("QuickJS\n"
            "usage: " PROG_NAME " [options] [file [args]]\n"
            "-h  --help         list options\n"
            "-e  --eval EXPR    evaluate EXPR\n"
